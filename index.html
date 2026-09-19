@@ -91,9 +91,6 @@ textarea.txt{font-family:inherit;font-size:14px;padding:10px 12px;border:1px sol
 .runbar .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .runbar .ttl{font-weight:700;font-size:15px;flex:1}
 .runbar .ttl small{display:block;font-weight:500;font-size:12px;color:var(--muted)}
-.runbar .clock{font-variant-numeric:tabular-nums;font-weight:700;font-size:17px;color:var(--brand);
-  background:#efeeff;padding:3px 11px;border-radius:8px}
-.runbar .clock.low{color:#fff;background:var(--bad)}
 .pbar{height:8px;background:#eef0f9;border-radius:99px;margin-top:10px;overflow:hidden}
 .pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-2));
   border-radius:99px;transition:width .35s}
@@ -127,7 +124,6 @@ textarea.txt{font-family:inherit;font-size:14px;padding:10px 12px;border:1px sol
 .rep{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;font-size:14px}
 .rep h4{margin:14px 0 4px;font-size:14px;color:var(--brand)}
 .rep .a{background:#f6f7fd;border-radius:7px;padding:8px 11px;white-space:pre-wrap}
-.timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:20px;color:var(--brand)}
 /* 데이터 표 */
 .tblwrap{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin:8px 0;background:#fff}
 .tblwrap table{margin:0;font-size:13px}
@@ -495,17 +491,6 @@ footer{max-width:1180px;margin:0 auto;padding:0 20px 40px;color:var(--muted);fon
       <tr><td><b>프로젝트·성찰</b><br>[12데과04-03·05]</td><td>두 방법의 결과를 비교해 근거 있는 결론을 내고, 한계와 사회적 영향·윤리를 구체적으로 성찰한다</td><td>두 방법을 비교하고 결론과 한계를 쓴다</td><td>안내에 따라 프로젝트 단계를 수행한다</td></tr>
     </table>
 
-    <h3>수업 타이머</h3>
-    <div class="noprint">
-      <span class="timer" id="tdisp">00:00</span>
-      <button class="btn ghost" data-min="5">5분</button>
-      <button class="btn ghost" data-min="10">10분</button>
-      <button class="btn ghost" data-min="15">15분</button>
-      <button class="btn ghost" data-min="50">50분</button>
-      <button class="btn" id="tstart">시작/정지</button>
-      <button class="btn ghost" id="tclear">리셋</button>
-    </div>
-
     <h3>데이터 출처와 저작권</h3>
     <div class="box phy"><b>이 수업앱의 이용 조건</b> — <b>CC BY-NC-SA 4.0</b>. 출처를 밝히면 자유롭게 쓰고 고칠 수 있습니다. 상업적 이용은 금지되며, 고친 것을 배포할 때는 같은 조건을 유지해 주세요. 학교 수업·교사 연수·공교육 활용은 비영리에 해당합니다.</div>
     <table>
@@ -586,6 +571,35 @@ const el = (tag, cls, html) => { const e=document.createElement(tag); if(cls)e.c
 const esc = s => String(s==null?'':s).replace(/[<>&"]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[m]));
 const stripTags = s => String(s).replace(/<br\s*\/?>/g,'\n').replace(/<[^>]+>/g,'');
 const isNum = v => typeof v==='number' && isFinite(v);
+
+/* ========== 아래 첨자 표시 ==========
+   화면 글자 속 유니코드 첨자 숫자(v₀, F₁, log₂ …)를 진짜 아래 첨자(<sub>)로 바꾼다. 새로 그려지는 화면도 따라가며 바꾼다.
+   캔버스 글자는 fillSub() 가 작고 낮게 그린다. 코드 편집기·코드 글꼴 안은 건드리지 않는다. */
+const SUB_DIG='₀₁₂₃₄₅₆₇₈₉';
+function fixSubs(root){
+  if(!root) return;
+  const skip=/^(SCRIPT|STYLE|TEXTAREA|CODE|PRE|SUB|OPTION)$/;
+  const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {acceptNode:n=>{ const p=n.parentNode;
+    if(!p||skip.test(p.nodeName)||(p.closest&&p.closest('code,pre,textarea'))) return NodeFilter.FILTER_REJECT;
+    return /[₀-₉]/.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP; }});
+  const list=[]; while(w.nextNode()) list.push(w.currentNode);
+  list.forEach(n=>{ const s=n.nodeValue, re=/[₀-₉]+/g, frag=document.createDocumentFragment(); let m, last=0;
+    while((m=re.exec(s))){ if(m.index>last) frag.appendChild(document.createTextNode(s.slice(last,m.index)));
+      const sb=document.createElement('sub'); sb.textContent=[...m[0]].map(ch=>SUB_DIG.indexOf(ch)).join(''); frag.appendChild(sb); last=m.index+m[0].length; }
+    if(last<s.length) frag.appendChild(document.createTextNode(s.slice(last)));
+    if(n.parentNode) n.parentNode.replaceChild(frag,n); });
+}
+new MutationObserver(ms=>ms.forEach(m=>{ if(m.type==='characterData'){ if(m.target.parentNode) fixSubs(m.target.parentNode); return; }
+  m.addedNodes.forEach(n=>{ if(n.nodeType===1) fixSubs(n); else if(n.nodeType===3&&n.parentNode) fixSubs(n.parentNode); }); }))
+  .observe(document.body,{childList:true,subtree:true,characterData:true});
+fixSubs(document.body);
+/* 캔버스용 : 첨자 숫자를 작고 낮게 그린다 (그 밖의 글자는 fillText 와 같다) */
+function fillSub(ctx,text,x,y){ text=String(text); if(!/[₀-₉]/.test(text)){ ctx.fillText(text,x,y); return; }
+  const f=ctx.font, px=parseFloat((/(\d+(?:\.\d+)?)px/.exec(f)||[0,12])[1]), small=f.replace(/(\d+(?:\.\d+)?)px/,(px*0.72).toFixed(1)+'px');
+  let cx=x; text.split(/([₀-₉]+)/).forEach((part,i)=>{ if(!part) return;
+    if(i%2){ const d=[...part].map(ch=>SUB_DIG.indexOf(ch)).join(''); ctx.font=small; ctx.fillText(d,cx,y+px*0.28); cx+=ctx.measureText(d).width; ctx.font=f; }
+    else { ctx.fillText(part,cx,y); cx+=ctx.measureText(part).width; } });
+  ctx.font=f; }
 
 /* ========== 상태 저장 ==========
    1편(정보 × 물리 융합수업 — 코드로 만드는 역학)과 같은 컴퓨터에서 써도 기록이 섞이지 않도록 키를 따로 쓴다. */
@@ -755,8 +769,12 @@ function go(t){
 
 /* ========== 그래프 ========== */
 function fit(cv){
-  const dpr=window.devicePixelRatio||1, w=cv.clientWidth||640, h=+cv.getAttribute('height')||300;
-  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  // 화면에 보이는 높이는 처음 정한 height 값으로 고정한다 — 고해상도(배율 125% 등) 화면에서 다시 그릴 때마다 캔버스가 커지지 않게
+  const dpr=window.devicePixelRatio||1, w=cv.clientWidth||640, a=+cv.getAttribute('height')||300;
+  if(!cv.dataset.h||a!==+cv.dataset.hp) cv.dataset.h=a;
+  const h=+cv.dataset.h; cv.style.height=h+'px';
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); cv.dataset.hp=cv.height;
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
   return {ctx,w,h};
 }
 function niceStep(m){ if(!(m>0)) return 1; const raw=m/6,p=Math.pow(10,Math.floor(Math.log10(raw))),n=raw/p;
@@ -794,9 +812,9 @@ function plotXY(cv, cfg){
   if(xmin<0&&xmax>0){ ctx.beginPath();ctx.moveTo(sx(0),pT);ctx.lineTo(sx(0),h-pB);ctx.stroke(); }
   ctx.beginPath();ctx.moveTo(pL,pT);ctx.lineTo(pL,h-pB);ctx.lineTo(w-pR,h-pB);ctx.stroke();
   ctx.fillStyle='#5a6580'; ctx.font='12px sans-serif';
-  if(cfg.xlabel) ctx.fillText(cfg.xlabel, w-pR-ctx.measureText(cfg.xlabel).width-2, h-6);
-  if(cfg.ylabel){ ctx.save(); ctx.translate(13,pT+4+ctx.measureText(cfg.ylabel).width); ctx.rotate(-Math.PI/2); ctx.fillText(cfg.ylabel,0,0); ctx.restore(); }
-  if(cfg.title){ ctx.font='bold 13px sans-serif'; ctx.fillStyle='#161b2e'; ctx.fillText(cfg.title,pL,16); }
+  if(cfg.xlabel) fillSub(ctx,cfg.xlabel, w-pR-ctx.measureText(cfg.xlabel).width-2, h-6);
+  if(cfg.ylabel){ ctx.save(); ctx.translate(13,pT+4+ctx.measureText(cfg.ylabel).width); ctx.rotate(-Math.PI/2); fillSub(ctx,cfg.ylabel,0,0); ctx.restore(); }
+  if(cfg.title){ ctx.font='bold 13px sans-serif'; ctx.fillStyle='#161b2e'; fillSub(ctx,cfg.title,pL,16); }
   ctx.save(); ctx.beginPath(); ctx.rect(pL,pT,w-pL-pR,h-pB-pT); ctx.clip();
   (cfg.hlines||[]).forEach(l=>{ ctx.strokeStyle=l.color||'#94a3b8'; ctx.lineWidth=l.width||1.2; ctx.setLineDash(l.dash||[5,5]);
     ctx.beginPath();ctx.moveTo(pL,sy(l.y));ctx.lineTo(w-pR,sy(l.y));ctx.stroke(); ctx.setLineDash([]);
@@ -823,13 +841,13 @@ function plotXY(cv, cfg){
       ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke(); }
     else { ctx.beginPath(); ctx.arc(sx(m.x),sy(m.y),m.r||6,0,7); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke(); }
     if(m.text){ ctx.fillStyle=m.tcolor||m.color||'#b45309'; ctx.font='bold 12px sans-serif';
-      const tw=ctx.measureText(m.text).width; let X=sx(m.x)+9; if(X+tw>w-pR) X=sx(m.x)-9-tw; ctx.fillText(m.text,X,sy(m.y)-8); } });
+      const tw=ctx.measureText(m.text).width; let X=sx(m.x)+9; if(X+tw>w-pR) X=sx(m.x)-9-tw; fillSub(ctx,m.text,X,sy(m.y)-8); } });
   ctx.restore();
   if(cfg.legend){ let ly=pT+12, lx=cfg.legendLeft? pL+12 : w-pR-170; ctx.font='12px sans-serif';
     (cfg.series||[]).forEach((s,si)=>{ if(!s.label) return; const col=s.color||PAL[si%PAL.length];
       ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(lx-4,ly-11,170,16);
       ctx.fillStyle=col; if(s.type==='dots'){ ctx.beginPath(); ctx.arc(lx+6,ly-4,4,0,7); ctx.fill(); } else ctx.fillRect(lx,ly-6,14,3);
-      ctx.fillStyle='#475569'; ctx.fillText(s.label,lx+20,ly); ly+=17; }); }
+      ctx.fillStyle='#475569'; fillSub(ctx,s.label,lx+20,ly); ly+=17; }); }
   return {sx,sy,ix:X=>xmin+(X-pL)/(w-pL-pR)*(xmax-xmin), iy:Y=>ymin+(h-pB-Y)/(h-pB-pT)*(ymax-ymin), xmin,xmax,ymin,ymax};
 }
 /* 히스토그램 */
@@ -1537,7 +1555,6 @@ function formulaLab(host, cfg){
 
 /* ========== 차시 렌더러 ========== */
 let LESSONS = {};                                 // 지금 고른 과정의 차시들 (courses.js 에서 바꾼다)
-let clockTimer=null, clockLeft=50*60, clockRun=false;
 function stepTags(s){ return (s.tags||[]).map(t=>t==='i'?'<span class="tag t-info">데이터 과학</span>':t==='c'?'<span class="tag t-info">정보</span>':t==='p'?'<span class="tag t-phy">역학과 에너지</span>':t==='b'?'<span class="tag t-both">융합</span>':`<span class="tag t-both">${t}</span>`).join(''); }
 function lessonScore(L){ const gs=getJ('gs_'+LK(L),null); return gs?gs.score:null; }
 /* 차시 마치기 : 채점 → 결과 화면 */
@@ -1580,16 +1597,9 @@ function renderLesson(L){
   const sc=lessonScore(L);
   if(sc!=null||(A['view_'+K]&&!lesson.steps.some(s=>s.graded))){ const rb=el('button','btn ghost sm',sc!=null?`📊 채점 결과 ${sc}점`:'📋 차시 정리'); rb.onclick=()=>{ A['view_'+K]='res'; save(); renderLesson(L); }; top.appendChild(rb); }
   else if(lesson.steps.some(s=>s.graded)) top.appendChild(el('span','kpi',S.mode==='now'?'채점 : 바로 확인':'채점 : 차시를 마칠 때'));
-  const clock=el('div','clock','50:00'); const cbtn=el('button','btn ghost sm',clockRun?'일시정지':'수업 타이머 시작');
-  top.appendChild(clock); top.appendChild(cbtn); bar.appendChild(top);
+  bar.appendChild(top);
   const pb=el('div','pbar','<i style="width:0"></i>'); bar.appendChild(pb);
   const dots=el('div','dots'); bar.appendChild(dots); host.appendChild(bar);
-  cbtn.onclick=()=>{ clockRun=!clockRun; cbtn.textContent=clockRun?'일시정지':'수업 타이머 시작';
-    if(clockTimer) clearInterval(clockTimer);
-    if(clockRun) clockTimer=setInterval(()=>{ if(clockLeft>0) clockLeft--; paintClock(); },1000); };
-  function paintClock(){ const m=String(Math.floor(clockLeft/60)).padStart(2,'0'), s=String(clockLeft%60).padStart(2,'0');
-    clock.textContent=m+':'+s; clock.classList.toggle('low',clockLeft<=300); }
-  paintClock();
   const card=el('div','card'); host.appendChild(card);
   function stepDone(id,ok){ if(ok&&!S.done[id]){ S.done[id]=true; save(); paintBar(); paintNav(); } }
   function paintBar(){ const n=lesson.steps.length, dn=lesson.steps.filter(s=>S.done[s.id]).length;
@@ -3302,7 +3312,7 @@ function drawArrow(ctx,x1,y1,x2,y2,color,w=3,label,lx=6,ly=-6){
   const L=Math.hypot(x2-x1,y2-y1); if(L<1) return; const ux=(x2-x1)/L, uy=(y2-y1)/L, h=Math.min(12,L*0.35);
   ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2-ux*h*0.8,y2-uy*h*0.8); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-ux*h-uy*h*0.5,y2-uy*h+ux*h*0.5); ctx.lineTo(x2-ux*h+uy*h*0.5,y2-uy*h-ux*h*0.5); ctx.closePath(); ctx.fill();
-  if(label){ ctx.font='bold 12px sans-serif'; ctx.fillText(label,x2+lx,y2+ly); } }
+  if(label){ ctx.font='bold 12px sans-serif'; fillSub(ctx,label,x2+lx,y2+ly); } }
 const DEG=Math.PI/180;
 /* 빗면 측정 자료 (모의) : 두 질량 × 일곱 기울기, 숨은 운동 마찰 계수 0.25 */
 const INCL = (()=>{ const r=rng(515), mu=0.25, out=[]; [0.5,1.0].forEach(m=>[15,20,25,30,35,40,45].forEach(th=>{
@@ -4611,16 +4621,8 @@ $('#nav').addEventListener('click',e=>{ const b=e.target.closest('button[data-ta
 if($('#courseBadge')) $('#courseBadge').onclick=()=>{ go('home'); const p=$('#pickCard'); if(p) p.scrollIntoView({behavior:'smooth'}); };
 if($('#mkrep')) $('#mkrep').onclick=buildReport;
 
-/* 교사 타이머 */
-let tSec=0,tRun=null;
-function tShow(){ const d=$('#tdisp'); if(d) d.textContent=String(Math.floor(tSec/60)).padStart(2,'0')+':'+String(tSec%60).padStart(2,'0'); }
-$$('button[data-min]').forEach(b=>b.onclick=()=>{ tSec=+b.dataset.min*60; tShow(); });
-if($('#tstart')) $('#tstart').onclick=()=>{ if(tRun){ clearInterval(tRun); tRun=null; return; }
-  tRun=setInterval(()=>{ if(tSec<=0){ clearInterval(tRun); tRun=null; alert('⏰ 시간이 끝났습니다!'); return; } tSec--; tShow(); },1000); };
-if($('#tclear')) $('#tclear').onclick=()=>{ clearInterval(tRun); tRun=null; tSec=0; tShow(); };
 if($('#unlock')){ $('#unlock').checked=!!S.unlock; $('#unlock').addEventListener('change',e=>{ S.unlock=e.target.checked; save(); }); }
 $$('input[name="gmode"]').forEach(r=>r.addEventListener('change',()=>{ if(r.checked){ S.mode=r.value; S.modeSet=true; save(); } }));
-tShow();
 
 setCourse(S.course||'F');
 let rz, lastW=window.innerWidth;
