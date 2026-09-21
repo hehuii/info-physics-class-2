@@ -174,6 +174,22 @@ td.bad{background:#fde8ea!important}
 .poster{border:2px solid var(--brand);border-radius:14px;padding:18px;background:#fff}
 .poster h3{margin-top:0}
 footer{max-width:1180px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:12.5px}
+/* ── 확인 · 알림 창 (브라우저 기본 창이 막힌 곳에서도 쓰려고 직접 그린다) ── */
+.modalbg{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal{background:#fff;border-radius:14px;padding:20px 22px;max-width:540px;box-shadow:0 10px 40px rgba(15,23,42,.3);font-size:14.5px;line-height:1.7}
+.modal .mbtn{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1e1b4b;color:#fff;padding:12px 18px;border-radius:12px;
+  font-size:14px;line-height:1.6;z-index:120;max-width:min(560px,92vw);box-shadow:0 8px 30px rgba(15,23,42,.35);transition:opacity .4s;cursor:pointer}
+.toast.ok{background:#146c43} .toast.bad{background:#a3242f}
+/* ── 교사 모드 : 학생 화면에는 [교육과정]·[교사 자료] 탭이 보이지 않는다 ── */
+body:not(.tmode) #nav button[data-tab="curr"], body:not(.tmode) #nav button[data-tab="teacher"]{display:none}
+body:not(.tmode) section#curr, body:not(.tmode) section#teacher{display:none!important}
+.logingrid{display:grid;grid-template-columns:minmax(240px,1fr) 2.1fr;gap:16px;align-items:start}
+.logingrid>div{border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.logingrid .tpanel{background:#fffbeb;border-color:#f3c48b}
+.logingrid h3{margin:0 0 6px;font-size:16px}
+@media(max-width:760px){.logingrid{grid-template-columns:1fr}.logingrid .tpanel{order:2}}
+header .who .tbadge{background:#fde68a;color:#7c2d12;border-radius:7px;padding:2px 8px;font-weight:700;font-size:12px}
 /* ── 학번 로그인 ── */
 .loginf{display:flex;gap:10px 14px;flex-wrap:wrap;align-items:flex-end;margin:12px 0 4px}
 .loginf label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
@@ -290,10 +306,10 @@ table.dash tr.row{cursor:pointer} table.dash tr.row:hover{background:#f5f6ff} ta
 <section class="tab" id="report">
   <div class="card">
     <h2>활동 보고서</h2>
-    <p class="sub">여덟 차시 동안 입력한 답과 점수입니다. 차시마다 <b>내 답과 정답</b>을 함께 보여 줍니다. [결과 파일 저장]으로 선생님께 제출하거나 인쇄하세요.</p>
+    <p class="sub">여덟 차시 점수와 내가 쓴 글을 한눈에 보여 줍니다. 문항마다 <b>내 답과 정답</b>을 보려면 아래 [문항별로 자세히 보기]를 누르세요. [결과 파일 저장]으로 선생님께 제출하거나 인쇄하세요.</p>
     <div style="margin-bottom:12px" class="noprint">
       <button class="btn" id="mkrep">보고서 새로 만들기</button>
-      <button class="btn teal" onclick="exportResult()">📤 결과 파일 저장</button>
+      <button class="btn teal" id="expBtn" onclick="exportResult()">📤 결과 파일 저장</button>
       <button class="btn ghost" onclick="window.print()">🖨 인쇄 / PDF 저장</button>
     </div>
     <div id="repBody" class="rep">[보고서 새로 만들기]를 누르세요.</div>
@@ -646,6 +662,28 @@ function fillSub(ctx,text,x,y){ text=String(text); if(!/[₀-₉]/.test(text)){ 
     else { ctx.fillText(part,cx,y); cx+=ctx.measureText(part).width; } });
   ctx.font=f; }
 
+
+/* ========== 확인 · 알림 창 ==========
+   앱 안의 브라우저 등에서는 브라우저 기본 창(confirm/alert)이 막혀 늘 '취소'가 된다. 그래서 직접 그린다. */
+function ask(msg, onYes, opt){
+  opt=opt||{};
+  const bg=el('div','modalbg'), c=el('div','modal');
+  c.innerHTML=`<div>${String(msg).replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
+  const row=el('div','mbtn'), no=el('button','btn ghost',opt.no||'취소'), yes=el('button','btn'+(opt.danger?' warn':''),opt.yes||'확인');
+  row.append(no,yes); c.appendChild(row); bg.appendChild(c); document.body.appendChild(bg);
+  const bye=()=>{ bg.remove(); document.removeEventListener('keydown',key); };
+  const close=()=>{ bye(); opt.onNo&&opt.onNo(); };
+  function key(e){ if(e.key==='Escape') close(); else if(e.key==='Enter'){ bye(); onYes&&onYes(); } }
+  no.onclick=close; bg.onclick=e=>{ if(e.target===bg) close(); };
+  yes.onclick=()=>{ bye(); onYes&&onYes(); };
+  document.addEventListener('keydown',key); setTimeout(()=>yes.focus(),0);
+}
+function say(msg, kind){
+  const t=el('div','toast'+(kind?' '+kind:''), String(msg).replace(/</g,'&lt;').replace(/\n/g,'<br>'));
+  document.body.appendChild(t); t.onclick=()=>t.remove();
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),450); }, Math.min(9000, 2600+String(msg).length*45));
+}
+
 /* ========== 상태 저장 · 학번 로그인 ==========
    학생마다 따로 저장한다 : localStorage['ipc2_data_state_v1@학번']. 지금 접속한 학번은 sessionStorage 에 둔다(브라우저 창을 닫으면 로그아웃).
    채점 방식(교사가 고름)은 학생 기록이 아니라 이 컴퓨터의 설정 'ipc2_data_state_v1__cfg' 에 둔다.
@@ -820,6 +858,7 @@ const FX = (()=>{
 /* ========== 탭 ========== */
 let curL='L1';
 function go(t){
+  if((t==='curr'||t==='teacher')&&!teacherOK()) t='home';     // 교육과정 · 교사 자료는 교사 모드에서만 연다
   $$('#nav button').forEach(x=>x.classList.toggle('on', x.dataset.tab===t));
   $$('section.tab').forEach(s=>s.classList.toggle('on', s.id===t));
   if(/^L[1-8]$/.test(t)){ curL=t; renderLesson(t); }
@@ -1457,7 +1496,7 @@ function classifyStep(cfg){
     build(c,done){ cfg.pre&&cfg.pre(c); c.appendChild(el('div','mission',cfg.mission));
       const blk=classifyBlock(c, cfg.id, cfg.cats, cfg.items); const fb=feedback(c);
       const b=el('button','btn teal','✓ 제출'); b.style.marginTop='8px'; c.appendChild(b);
-      b.onclick=()=>{ const bl=blk.blank(); if(bl&&!confirm(`아직 고르지 않은 항목이 ${bl}개 있습니다. 이대로 제출할까요?`)) return;
+      b.onclick=()=>{ const bl=blk.blank(); if(bl&&!b._ok){ ask(`아직 고르지 않은 항목이 ${bl}개 있습니다. 이대로 제출할까요?`,()=>{ b._ok=1; b.onclick(); },{yes:'그대로 제출'}); return; }
         submitG(cfg.id, fb, blk.parts(), (cfg.ok||'')+`<div class="hint" style="margin-top:4px">정답 : ${blk.key()}</div>`, blk.mine()); if(revealNow(cfg.id)) blk.mark(); done(true); };
       cfg.post&&cfg.post(c);
       if(getGrade(cfg.id)){ showGrade(fb,cfg.id); if(revealNow(cfg.id)) blk.mark(); done(true); } },
@@ -1626,9 +1665,11 @@ function finishLesson(L){
   const les=LESSONS[L], G=les.steps.filter(s=>s.graded), lk=LK(L);
   if(G.length&&!isGraded(lk)){
     const miss=G.filter(s=>!getGrade(s.id));
-    if(!confirm((miss.length?`제출하지 않은 문항이 ${miss.length}개 있습니다. 이 문항은 0점으로 처리됩니다.\n\n`:'')+`${L[1]}차시를 채점할까요?\n채점한 뒤에는 답을 고쳐도 점수가 바뀌지 않습니다.`)) return;
-    const items=G.map(s=>{ const g=getGrade(s.id); return {id:s.id, s:g?g.s:0, sub:!!g}; });
-    setJ('gs_'+lk,{at:Date.now(), items, score:Math.round(items.reduce((a,x)=>a+x.s,0)/items.length*100)});
+    ask((miss.length?`제출하지 않은 문항이 ${miss.length}개 있습니다. 이 문항은 0점으로 처리됩니다.\n\n`:'')+`${L[1]}차시를 채점할까요?\n채점한 뒤에는 답을 고쳐도 점수가 바뀌지 않습니다.`,
+      ()=>{ const items=G.map(s=>{ const g=getGrade(s.id); return {id:s.id, s:g?g.s:0, sub:!!g}; });
+        setJ('gs_'+lk,{at:Date.now(), items, score:Math.round(items.reduce((a,x)=>a+x.s,0)/items.length*100)});
+        A['view_'+lk]='res'; save(); paintNav(); renderLesson(L); window.scrollTo({top:0,behavior:'smooth'}); }, {yes:'채점하기'});
+    return;
   }
   A['view_'+lk]='res'; save(); paintNav(); renderLesson(L); window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -1675,9 +1716,10 @@ function resultsView(L, back){
 function renderLesson(L){
   const lesson=LESSONS[L]; const host=$('#'+L); host.innerHTML='';
   if(!lesson){ host.innerHTML='<div class="card">이 차시는 준비 중입니다.</div>'; return; }
-  if(!loggedIn()){ const c=el('div','card');
+  if(!loggedIn()&&!teacherOK()){ const c=el('div','card');
     c.innerHTML=`<h2>먼저 학번과 이름을 입력하세요</h2><p class="sub">내 답과 점수가 학번별로 저장됩니다. 입력하면 바로 ${L[1]}차시가 시작됩니다.</p>`;
     host.appendChild(c); loginForm(c, ()=>renderLesson(L)); return; }
+  if(!loggedIn()) host.appendChild(el('div','box warn','👩‍🏫 <b>교사 미리보기</b> — 학생 화면을 그대로 보여 줍니다. 풀어 볼 수 있지만 기록은 저장되지 않습니다.'));
   const K=LK(L); CUR_LK=K;                        // 진도·채점 기록은 과정별로 따로
   let idx=Math.min(S.pos[K]||0, lesson.steps.length-1);
   const bar=el('div','runbar'); const top=el('div','top');
@@ -1714,11 +1756,13 @@ function renderLesson(L){
     prev.onclick=()=>{ idx--; S.pos[K]=idx; save(); show(); window.scrollTo({top:0,behavior:'smooth'}); };
     const last=idx===lesson.steps.length-1;
     const next=el('button','btn big', last?(isGraded(K)||!lesson.steps.some(x=>x.graded)?'차시 정리 보기 ✓':'차시 완료 · 채점하기 ✓'):'다음 단계 →');
-    next.onclick=()=>{ const r=s.check();
-      if(!r.ok&&!isGraded(K)&&!confirm(`${r.msg}\n완료하지 않아도 다음으로 넘어갈 수 있고, 진행 점을 눌러 언제든 돌아올 수 있습니다. 넘어갈까요?`+(s.graded?'\n(제출하지 않은 문항은 0점으로 채점됩니다)':''))) return;
-      S.done[s.id]=true; save(); paintNav();
+    const goNext=()=>{ S.done[s.id]=true; save(); paintNav();
       if(!last){ idx++; S.pos[K]=idx; save(); show(); window.scrollTo({top:0,behavior:'smooth'}); }
       else finishLesson(L); };
+    next.onclick=()=>{ const r=s.check();
+      if(!r.ok&&!isGraded(K)){ ask(`${r.msg}\n완료하지 않아도 다음으로 넘어갈 수 있고, 진행 점을 눌러 언제든 돌아올 수 있습니다.`+(s.graded?'\n(제출하지 않은 문항은 0점으로 채점됩니다)':''),
+          goNext, {yes:'그냥 넘어가기'}); return; }
+      goNext(); };
     nb.appendChild(prev); nb.appendChild(el('div','spacer')); nb.appendChild(next); card.appendChild(nb);
     paintBar();
   }
@@ -2115,7 +2159,7 @@ LESSONS.L2 = { title:'2차시 · 데이터 수집 — 동영상에서 데이터�
     function step(d){ f=Math.max(0,Math.min(VID_FRAMES,f+d)); A['2-2f']=f; save(); draw(); }
     bP.onclick=()=>step(-3); bN.onclick=()=>step(3);
     bUndo.onclick=()=>{ pts.pop(); setJ('2-2pts',pts); draw(); };
-    bClr.onclick=()=>{ if(confirm('찍은 점을 모두 지울까요?')){ pts=[]; setJ('2-2pts',pts); f=0; A['2-2f']=0; save(); draw(); } };
+    bClr.onclick=()=>ask('찍은 점을 모두 지울까요?',()=>{ pts=[]; setJ('2-2pts',pts); f=0; A['2-2f']=0; save(); draw(); },{yes:'지우기',danger:1});
     let playing=null; bPlay.onclick=()=>{ if(playing){ clearInterval(playing); playing=null; bPlay.textContent='▶ 재생'; return; }
       let ff=0; bPlay.textContent='■ 정지'; playing=setInterval(()=>{ vidDraw(cv,ff,pts); ff++; if(ff>VID_FRAMES){ clearInterval(playing); playing=null; bPlay.textContent='▶ 재생'; draw(); } },1000/30); };
     cv.addEventListener('click',e=>{ const rc=cv.getBoundingClientRect(), k=rc.width/VID.w;
@@ -2123,7 +2167,7 @@ LESSONS.L2 = { title:'2차시 · 데이터 수집 — 동영상에서 데이터�
       pts=pts.filter(p=>p.f!==f); pts.push({f,px:+px.toFixed(1),py:+py.toFixed(1)}); pts.sort((a,b)=>a.f-b.f); setJ('2-2pts',pts);
       if(f+3<=VID_FRAMES) f+=3; A['2-2f']=f; save(); draw(); });
     const cb=el('button','btn teal','✓ 제출'); cb.style.marginTop='10px'; c.appendChild(cb);
-    cb.onclick=()=>{ if(pts.length<12&&!confirm(`아직 ${pts.length}개입니다(목표 12개 이상). 이대로 제출할까요?`)) return;
+    cb.onclick=()=>{ if(pts.length<12&&!cb._ok){ ask(`아직 ${pts.length}개입니다(목표 12개 이상). 이대로 제출할까요?`,()=>{ cb._ok=1; cb.onclick(); },{yes:'그대로 제출'}); return; }
       const errs=pts.map(p=>{ const [bx,by]=vidPos(p.f); return Math.hypot(p.px-bx,p.py-by); });
       const me=errs.length?ST.mean(errs):99, cm=me/VID.scale*100, worst=errs.length?errs.indexOf(Math.max(...errs)):-1;
       submitG('2-2', fb, [['12개 이상 수집', pts.length>=12], ['공의 중심을 정확히 찍기 (평균 오차 6 px 이하)', me<=6]],
@@ -2163,7 +2207,7 @@ LESSONS.L2 = { title:'2차시 · 데이터 수집 — 동영상에서 데이터�
     const fb=feedback(c); const b=el('button','btn teal','✓ 제출'); b.style.marginTop='8px'; c.appendChild(b);
     const EX=`판단 기준 : "여러 번 측정해 평균하면 줄어드는가?" — 줄어들면 우연 오차, 줄지 않으면 편향입니다. 원근 왜곡·기준 막대 위치·골라서 분석·낮은 프레임 속도는 <b>편향</b>, 손 떨림·조명 깜빡임은 <b>우연 오차</b>입니다.<br>
       특히 <b>잘 던진 영상만 골라 분석</b>하는 것은 '선택 편향'입니다. 수집 과정에서 편향이 생기면 분석을 아무리 잘해도 결론이 틀어집니다. 데이터 과학 교육과정이 <b>"편향되지 않도록 수집"</b>을 가장 먼저 강조하는 까닭입니다.`;
-    b.onclick=()=>{ const bl=blk.blank(); if(bl&&!confirm(`아직 고르지 않은 항목이 ${bl}개 있습니다. 이대로 제출할까요?`)) return;
+    b.onclick=()=>{ const bl=blk.blank(); if(bl&&!b._ok){ ask(`아직 고르지 않은 항목이 ${bl}개 있습니다. 이대로 제출할까요?`,()=>{ b._ok=1; b.onclick(); },{yes:'그대로 제출'}); return; }
       submitG('2-3', fb, blk.parts(), EX+`<div class="hint" style="margin-top:4px">정답 : ${blk.key()}</div>`, blk.mine()); if(revealNow('2-3')) blk.mark(); done(true); };
     if(getGrade('2-3')){ showGrade(fb,'2-3'); if(revealNow('2-3')) blk.mark(); done(true); }
   },
@@ -2725,7 +2769,7 @@ print(fit_line([1, 2, 3, 4], [3, 5, 7, 9]))`,
     const sel=getJ('5-5s',['','','']);
     qs.forEach((q,i)=>{ const r=el('div'); r.style.margin='6px 0'; r.innerHTML=`<b>${q[0]}</b> → `; selectBox(r,opts,sel[i],vv=>{ sel[i]=vv; setJ('5-5s',sel); }); c.appendChild(r); });
     const fb=feedback(c); const b=el('button','btn teal','✓ 제출'); c.appendChild(b);
-    b.onclick=()=>{ if(vis.size<3&&!confirm('세 모델을 모두 눌러 보지 않았습니다. 이대로 제출할까요?')) return;
+    b.onclick=()=>{ if(vis.size<3&&!b._ok){ ask('세 모델을 모두 눌러 보지 않았습니다. 이대로 제출할까요?',()=>{ b._ok=1; b.onclick(); },{yes:'그대로 제출'}); return; }
       const nm={lin:'선형 회귀',knn:'k-최근접 이웃',tree:'의사결정트리'};
       submitG('5-5', fb, qs.map((q,i)=>[q[0].split(' ')[0]+' '+q[0].split(' ').slice(1,4).join(' ')+'…', sel[i]===q[1]]),
         `정답 : ① <b>k-최근접 이웃</b> (k = 1이면 훈련 데이터를 그대로 외워 오차가 0) ② <b>선형 회귀</b> ③ <b>선형 회귀</b>.<br>
@@ -2861,7 +2905,7 @@ choiceStep({id:'6-1', min:4, title:'케플러가 되어 보자 — 예측부터'
     const r2=el('div'); r2.style.marginTop='6px'; r2.innerHTML='<b>② 현상 :</b> '; c.appendChild(r2); let p2=A['6-4b']??'';
     selectBox(r2,[['','— 고르세요 —'],['under','과소적합 — 모델이 너무 단순해 훈련 데이터도 못 맞힘'],['over','과적합 — 훈련 데이터를 외워 새 데이터에 일반화하지 못함'],['norm','정규화']],p2,v=>{p2=v;A['6-4b']=v;save();});
     const fb=feedback(c); const b=el('button','btn teal','✓ 제출'); b.style.marginTop='8px'; c.appendChild(b);
-    b.onclick=()=>{ if(vis.size<4&&!confirm('네 모델을 모두 눌러 보지 않았습니다. 이대로 제출할까요?')) return;
+    b.onclick=()=>{ if(vis.size<4&&!b._ok){ ask('네 모델을 모두 눌러 보지 않았습니다. 이대로 제출할까요?',()=>{ b._ok=1; b.onclick(); },{yes:'그대로 제출'}); return; }
       submitG('6-4', fb, [['① 예측에 가장 알맞은 모델', p1==='pw'], ['② 현상의 이름', p2==='over']],
         `정답 : ① <b>거듭제곱 모델</b> ② <b>과적합</b>. 4차식은 점 5개를 모두 정확히 지나지만(훈련 오차 0) 테스트 데이터에서는 엉뚱한 값을 냅니다.
         거듭제곱 모델은 목성까지의 자료만으로 만들었는데도 토성·천왕성·해왕성과 세레스까지 잘 맞힙니다 — 데이터 속의 <b>진짜 법칙</b>을 잡았기 때문에 <b>일반화</b>가 되는 것입니다.`,
@@ -3209,7 +3253,7 @@ LESSONS.L8 = { title:'8차시 · 데이터 과학 프로젝트 — 나만의 역
     const g=el('div','grid g2'); c.appendChild(g); let opt=A['8-opt']||'';
     Object.entries(PROJ).forEach(([k,p])=>{ const d=el('div','card'); d.style.cssText=`cursor:pointer;margin:0;border:2px solid ${opt===k?'var(--brand)':'var(--line)'};background:${opt===k?'#f5f4ff':'#fff'}`;
       d.innerHTML=`<div style="font-size:24px">${p.icon}</div><b>${'①②③④'['ABCD'.indexOf(k)]} ${p.name}</b><div class="hint">${p.tag} · ${p.std}</div>`;
-      d.onclick=()=>{ if(A['8-opt']&&A['8-opt']!==k&&pRows().length&&!confirm('주제를 바꾸면 모은 데이터가 지워집니다. 바꿀까요?')) return;
+      d.onclick=()=>{ if(A['8-opt']&&A['8-opt']!==k&&pRows().length&&!d._ok){ ask('주제를 바꾸면 모은 데이터가 지워집니다. 바꿀까요?',()=>{ d._ok=1; d.onclick(); },{yes:'바꾸기',danger:1}); return; }
         if(A['8-opt']!==k){ setJ('8-rows',[]); A['8-n']=(+(A['8-n']||0)+1); delete A['8-1']; ['8-2','8-3','8-4','8-5'].forEach(x=>{ delete A[x]; delete S.done[x]; }); }
         A['8-opt']=k; save(); renderLesson('L8'); }; g.appendChild(d); });
     if(!opt){ c.appendChild(el('div','box warn','주제를 먼저 골라 주세요.')); return; }
@@ -3266,7 +3310,7 @@ LESSONS.L8 = { title:'8차시 · 데이터 과학 프로젝트 — 나만의 역
       const meas=k=>{ const rows=pRows(); for(let i=0;i<k;i++){ const n=P.timed?+how:1; rows.push({x:+(+v.x).toFixed(P.x.d), y:+P.gen(+v.x,n,r).toFixed(4), how:P.timed?(n===10?'10주기÷10':'1주기'):'측정'}); } setJ('8-rows',rows); refresh(); };
       mb.onclick=()=>meas(1); m3.onclick=()=>meas(3);
       ub.onclick=()=>{ const rows=pRows(); rows.pop(); setJ('8-rows',rows); refresh(); };
-      cb.onclick=()=>{ if(confirm('모은 데이터를 모두 지울까요?')){ setJ('8-rows',[]); refresh(); } };
+      cb.onclick=()=>ask('모은 데이터를 모두 지울까요?',()=>{ setJ('8-rows',[]); refresh(); },{yes:'지우기',danger:1});
       if(opt8()==='B'){ c.appendChild(el('div','hint','질량을 모르는 물체(우주인 체험 인형)의 주기는 모델링 단계에서 측정해 질량을 예측합니다.')); }
     }
     c.appendChild(prog); const g=el('div','grid g2'); c.appendChild(g); g.appendChild(tb); g.appendChild(cv);
@@ -3760,7 +3804,7 @@ const P_STEPS = {
     const mark=()=>{ if(!revealNow('p7-3')) return; res.style.display='block';
       LINES.forEach((L,i)=>{ const ok=String(sel[i])===String(L.a); rows[i].classList.toggle('ok',ok); rows[i].classList.toggle('no',!ok); let an=rows[i].querySelector('.ans'); if(!an){ an=el('span','ans hint'); rows[i].appendChild(an); } an.style.color=ok?'#136c3d':''; an.innerHTML=`→ 정답 : <b>${L.o[L.a]}</b> (${L.why})`; });
       [[q5,1],[q6,0]].forEach(([q,a])=>q.wr.querySelectorAll('.opt').forEach((x,xi)=>{ x.classList.toggle('correct',xi===a); x.classList.toggle('wrong',xi===q.v&&xi!==a); })); };
-    b.onclick=()=>{ const blank=sel.filter(x=>x===''||x==null).length; if(blank&&!confirm(`아직 고르지 않은 빈칸이 ${blank}개 있습니다. 이대로 제출할까요?`)) return;
+    b.onclick=()=>{ const blank=sel.filter(x=>x===''||x==null).length; if(blank&&!b._ok){ ask(`아직 고르지 않은 빈칸이 ${blank}개 있습니다. 이대로 제출할까요?`,()=>{ b._ok=1; b.onclick(); },{yes:'그대로 제출'}); return; }
       submitG('p7-3', fb, [...LINES.map((L,i)=>[`유도 ${'①②③④'[i]}`, String(sel[i])===String(L.a)]), ['⑤ 위성의 질량과 주기', q5.v===1], ['⑥ 비례 상수가 다른 까닭', q6.v===0]],
         `정답 : ① GMm/r² = <b>mv²/r</b> ② v = <b>2πr/T</b> ③ GMm/r² = <b>4π²mr/T²</b> ④ <b>T² = (4π²/GM)·r³</b> ⑤ <b>변하지 않는다</b> ⑥ <b>중심 천체의 질량</b>이 다르기 때문.<br>
         만유인력이 구심력 역할을 한다는 조건 하나로 케플러가 관측에서 찾은 <b>T² ∝ r³</b>이 수식으로 나옵니다. 비례 상수 4π²/GM에는 <b>중심 천체의 질량 M</b>만 들어 있고 공전하는 천체의 질량 m은 없습니다.
@@ -3943,7 +3987,7 @@ const P_STEPS = {
     let rows=getJ('p5-7rows',[]);
     mb.onclick=()=>{ const rr=rng(9000+rows.length*13+n*7+Math.round(r*10)); const t10=10*Tth(n,r)+gauss(rr)*0.08, T=t10/10;
       rows.push({n,r,t10:+t10.toFixed(2),T:+T.toFixed(3),inv:+(1/(T*T)).toFixed(2)}); setJ('p5-7rows',rows); tbl(); };
-    clr.onclick=()=>{ if(confirm('기록을 모두 지울까요?')){ rows=[]; setJ('p5-7rows',rows); tbl(); } };
+    clr.onclick=()=>ask('기록을 모두 지울까요?',()=>{ rows=[]; setJ('p5-7rows',rows); tbl(); },{yes:'지우기',danger:1});
     function tbl(){ tb.innerHTML=''; tableView(tb,[{k:'n',label:'추의 개수',d:0},{k:'r',label:'반지름 r (m)',d:1},{k:'t10',label:'10바퀴 시간 (s)',d:2},{k:'T',label:'주기 T (s)',d:3},{k:'inv',label:'1/T² (s⁻²)',d:2}],rows,{maxH:180,idx:1});
       plotXY(cv2,{title:'1/T² – 추의 개수',series:[0.3,0.5,0.7].map((rv,i)=>({type:'dots',pts:rows.filter(x=>x.r===rv).map(x=>[x.n,x.inv]),color:PAL[i],r:5,label:`r = ${rv} m`})),legend:true,legendLeft:true,xlabel:'추의 개수',ylabel:'1/T² (s⁻²)',xmin:0,xmax:4.5,ymin:0,ymax:9}); }
     let ang=0, last=performance.now();
@@ -4008,7 +4052,7 @@ const P_STEPS = {
     let rows=getJ('p6-7rows',[]);
     mb.onclick=()=>{ const rr=rng(4100+rows.length*31+Math.round(v.L*100)); const t10=10*2*Math.PI*Math.sqrt(v.L/g)+gauss(rr)*0.12;
       rows.push({L:+v.L.toFixed(1),t10:+t10.toFixed(2),T:+(t10/10).toFixed(3),T2:+((t10/10)**2).toFixed(3)}); setJ('p6-7rows',rows); tbl(); };
-    clr.onclick=()=>{ if(confirm('기록을 모두 지울까요?')){ rows=[]; setJ('p6-7rows',rows); tbl(); } };
+    clr.onclick=()=>ask('기록을 모두 지울까요?',()=>{ rows=[]; setJ('p6-7rows',rows); tbl(); },{yes:'지우기',danger:1});
     function tbl(){ tb.innerHTML=''; tableView(tb,[{k:'L',label:'L (m)',d:1},{k:'t10',label:'10회 왕복 (s)',d:2},{k:'T',label:'T (s)',d:3},{k:'T2',label:'T² (s²)',d:3}],rows,{maxH:170,idx:1});
       const nL=new Set(rows.map(r=>r.L)).size, s1=rows.reduce((s,r)=>s+r.L*r.T2,0), s2=rows.reduce((s,r)=>s+r.L*r.L,0), k=s2?s1/s2:NaN, ok=nL>=4;
       plotXY(cv2,{title:'T² – L',series:[{type:'dots',pts:rows.map(r=>[r.L,r.T2]),color:'#4f46e5',r:5},...(ok?[{pts:[[0,0],[1.3,k*1.3]],color:'#e07b2c',width:2,dash:[6,4]}]:[])],xlabel:'L (m)',ylabel:'T² (s²)',xmin:0,xmax:1.3,ymin:0,ymax:5.5});
@@ -4284,7 +4328,7 @@ const I_STEPS = {
     const q3=mk('③ 자료가 100배(28개 → 2800개)로 늘 때 비교 횟수가 가장 조금 늘어나는 전략은?',Q3,'i4-4c'), q4=mk('④ 전략 C를 쓸 수 있는 조건은?',Q4,'i4-4d');
     const fb=feedback(c); const b=el('button','btn teal','✓ 제출'); b.style.marginTop='8px'; c.appendChild(b);
     const cA=peakRun(PEAK_DATA[28],'A').count, cC=peakRun(PEAK_DATA[28],'C').count;
-    b.onclick=()=>{ if(ran.size<9&&!confirm('아직 표를 모두 채우지 않았습니다. 이대로 제출할까요?')) return;
+    b.onclick=()=>{ if(ran.size<9&&!b._ok){ ask('아직 표를 모두 채우지 않았습니다. 이대로 제출할까요?',()=>{ b._ok=1; b.onclick(); },{yes:'그대로 제출'}); return; }
       submitG('i4-4', fb, [['① 28개일 때 전략 A', +n1.value===cA], ['② 28개일 때 전략 C', +n2.value===cC], ['③ 가장 조금 늘어나는 전략', q3.v===2], ['④ 전략 C의 조건', q4.v===0]],
         `정답 : ① <b>${cA}회</b> ② <b>${cC}회</b> ③ <b>전략 C</b> — 자료가 100배가 되어도 비교 횟수는 ${cC}회 → ${peakRun(PEAK_DATA[2800],'C').count}회로 조금만 늡니다(한 번 비교할 때마다 절반씩 버리므로). 전략 A는 ${cA}회 → ${peakRun(PEAK_DATA[2800],'A').count}회로 자료 수에 비례해 늘어납니다. ④ 봉우리가 하나인 자료일 때만 쓸 수 있습니다.<br>
         자료가 많을수록 <b>전략(알고리즘)의 차이</b>가 수행 시간에 큰 영향을 줍니다. 다만 빠른 전략은 자료에 대한 <b>조건(봉우리가 하나)</b>이 맞아야 쓸 수 있습니다.`,
@@ -4639,25 +4683,75 @@ window.addEventListener('hashchange',()=>{ const k=HASH2COURSE[(location.hash||'
 
 /* ===== report.js ===== */
 /* =====================================================================
-   report.js — 활동 보고서 (학번 · 이름 · 차시별 점수 · 문항마다 내 답과 정답 · 프로젝트 · 코드)
+   report.js — 활동 보고서
+   · 학생 : 차시 점수 요약과 내가 쓴 글 (문항별 자세히 보기는 단추로)
+   · 교사 모드 : [교사 자료]에 불러온 모든 학생의 보고서를 골라 보거나 한 번에 인쇄
    ===================================================================== */
+let repSel=null, repAll=false, repDetail=false;
 function buildReport(){
   const b=$('#repBody'); b.innerHTML='';
+  const ex=$('#expBtn'); if(ex) ex.style.display=(loggedIn()&&!teacherOK())?'':'none';
+  if(teacherOK()){ b.appendChild(teacherReport()); return; }
   if(!loggedIn()){ b.appendChild(el('p',null,'<b>먼저 학번과 이름을 입력하세요.</b> 입력하면 여기에 내 답과 점수가 모입니다.')); loginForm(b, buildReport); return; }
+  b.appendChild(reportEl(false));
+}
+function teacherReport(){
+  const d=el('div');
+  const recs=DASH.slice();
+  if(loggedIn()&&!recs.some(r=>r.p.sid===S.sid)) recs.push({p:payloadOf(S), how:'local'});
+  recs.sort((a,b)=>String(a.p.course||'').localeCompare(String(b.p.course||''))||String(a.p.sid).localeCompare(String(b.p.sid),'ko',{numeric:true}));
+  if(!recs.length){ d.innerHTML='<div class="box warn"><b>불러온 학생 결과가 없습니다.</b> [교사 자료] 탭의 <b>학생 결과 모아 보기</b>에서 학생이 낸 결과 파일을 불러오거나 [이 컴퓨터에 저장된 학생 기록 불러오기]를 누르면, 여기에서 학생별 활동 보고서를 볼 수 있습니다.</div>';
+    const g=el('button','btn','교사 자료로 가기'); g.onclick=()=>go('teacher'); d.appendChild(g); return d; }
+  if(!repSel||!recs.some(r=>r.p.sid===repSel)) repSel=recs[0].p.sid;
+  const bar=el('div','noprint'); bar.style.margin='0 0 10px';
+  const sel=el('select'); sel.style.cssText='font-family:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;margin-right:8px';
+  recs.forEach(r=>{ const o=document.createElement('option'); o.value=r.p.sid;
+    o.textContent=`${r.p.sid} ${r.p.name} · ${(COURSES[r.p.course]||{}).name||''}`; if(r.p.sid===repSel) o.selected=true; sel.appendChild(o); });
+  sel.onchange=()=>{ repSel=sel.value; repAll=false; buildReport(); };
+  const b1=el('button','btn ghost sm', repAll?'한 학생만 보기':`모든 학생 보기 (${recs.length}명 · 인쇄용)`);
+  b1.onclick=()=>{ repAll=!repAll; buildReport(); };
+  bar.append(el('b',null,'학생 : '), sel, b1); d.appendChild(bar);
+  d.appendChild(el('p','hint',`불러온 학생 ${recs.length}명 · 학생이 저장한 결과 파일(또는 이 컴퓨터의 기록) 기준이며, 교사 화면에서는 모든 문항의 정답이 함께 보입니다.`));
+  (repAll?recs:recs.filter(r=>r.p.sid===repSel)).forEach((r,i)=>{
+    const w=el('div'); if(repAll&&i) w.style.cssText='page-break-before:always;border-top:2px solid var(--line);margin-top:26px;padding-top:14px';
+    w.appendChild(withState(r.p.state, ()=>reportEl(true, r.p)));
+    d.appendChild(w); });
+  return d;
+}
+/* 지금 끼워진 기록(S·A·LESSONS)으로 한 학생의 보고서를 만든다 */
+function reportEl(teacher, who){
+  const b=el('div');
   const Ls=Object.keys(LESSONS), ev=Ls.map(L=>lessonEval(L));
   const total=ev.reduce((n,r)=>n+r.total,0), donec=ev.reduce((n,r)=>n+r.done,0);
   const now=new Date(), ds=`${now.getFullYear()}. ${now.getMonth()+1}. ${now.getDate()}.`;
-  const CC=COURSES[S.course]||COURSES.F, vis=r=>r.started&&r.score!=null&&(r.fixed||S.mode==='now');
+  const CC=COURSES[S.course]||COURSES.F, vis=r=>r.started&&r.score!=null&&(r.fixed||S.mode==='now'||teacher);
+  const sid=who?who.sid:S.sid, name=who?who.name:S.name;
   b.innerHTML=`<h3 style="margin-top:0">정보-물리 융합수업(2) · ${CC.name} — 활동 보고서</h3>
     <p class="sub" style="margin:0 0 6px">${CC.icon} ${CC.name} (${CC.subj})</p>
-    <table><tr><th style="width:64px">학번</th><td>${esc(S.sid)}</td><th style="width:64px">이름</th><td>${esc(S.name)}</td>
+    <table><tr><th style="width:64px">학번</th><td>${esc(sid)}</td><th style="width:64px">이름</th><td>${esc(name)}</td>
       <th style="width:84px">완료 단계</th><td><b>${donec} / ${total}</b></td><th style="width:64px">작성일</th><td>${ds}</td></tr></table>
     <div class="tscroll"><table><tr><th>차시</th>${Ls.map(L=>`<th style="text-align:center">${L[1]}</th>`).join('')}</tr>
       <tr><td>점수</td>${ev.map(r=>`<td style="text-align:center">${vis(r)?`<b>${r.score}</b>${r.fixed?'':'<span class="hint">*</span>'}`:'—'}</td>`).join('')}</tr>
       <tr><td>완료</td>${ev.map(r=>`<td style="text-align:center">${r.done}/${r.total}</td>`).join('')}</tr></table></div>
     <p class="hint">점수는 처음 제출한 답으로 매깁니다. * 는 아직 차시를 마치지 않아 지금까지 제출한 답으로 셈한 점수입니다.</p>`;
-  Ls.forEach(L=>{ b.appendChild(el('h4',null,esc(LESSONS[L].title))); b.appendChild(resultsTable(L,{full:true})); });
-
+  const detail=!!teacher||repDetail;
+  if(!detail){                                    // 학생용 : 차시 점수 요약 + 내가 쓴 글
+    let t=`<div class="tscroll"><table><tr><th style="width:56px">차시</th><th>주제</th><th style="width:64px">점수</th><th style="width:74px">완료 단계</th><th style="width:36%">채점 문항</th></tr>`;
+    Ls.forEach((L,i)=>{ const r=ev[i], G=r.G, c={o:0,p:0,x:0,n:0};
+      G.forEach(s=>{ const it=r.items.find(x=>x.id===s.id); if(!it||!it.sub) c.n++; else if(it.s>=0.999) c.o++; else if(it.s<=0.001) c.x++; else c.p++; });
+      t+=`<tr><td><b>${L[1]}차시</b></td><td>${esc(LESSONS[L].title.replace(/^\d차시 · /,''))}</td>
+        <td style="text-align:center">${vis(r)?`<b>${r.score}</b>`:'—'}</td><td style="text-align:center">${r.done}/${r.total}</td>
+        <td class="hint">${G.length?`정답 ${c.o} · 부분 ${c.p} · 오답 ${c.x} · 미제출 ${c.n}`:'자동 채점 문항 없음'}</td></tr>`; });
+    const box=el('div'); box.innerHTML=t+'</table></div>'; b.appendChild(box);
+    const w=writtenList();
+    if(w){ const x=el('div'); x.innerHTML='<h4>내가 쓴 글과 활동 기록</h4><div style="font-size:14px">'+w+'</div>'; b.appendChild(x); }
+    const more=el('button','btn ghost sm noprint','📋 문항별로 자세히 보기 (내 답과 정답)');
+    more.onclick=()=>{ repDetail=true; buildReport(); window.scrollTo({top:0,behavior:'smooth'}); };
+    b.appendChild(more);
+  } else {
+    if(!teacher){ const less=el('button','btn ghost sm noprint','← 간단히 보기'); less.onclick=()=>{ repDetail=false; buildReport(); window.scrollTo({top:0,behavior:'smooth'}); }; b.appendChild(less); }
+    Ls.forEach(L=>{ b.appendChild(el('h4',null,esc(LESSONS[L].title))); b.appendChild(resultsTable(L,{full:true, teacher:!!teacher})); });
+  }
   let h='';
   // 8차시 프로젝트 요약
   if(A['8-opt']){ const P=PROJ[A['8-opt']]; const U=pUsed();
@@ -4673,9 +4767,17 @@ function buildReport(){
     const CH=['데이터로 답할 수 있는 탐구 질문','편향·오차를 줄이는 수집 설계','근거 있는 결측치·이상치 처리','그래프와 통계로 탐색','두 가지 이상 방법 비교','한계와 사회적 영향 성찰'];
     const ck=getJ('8-chk',[]); if(ck.length){ h+='<p class="sub" style="margin:6px 0 2px">자기 평가</p><div class="a">'+CH.map((t,i)=>(ck[i]?'☑ ':'☐ ')+t).join('\n')+'</div>'; } }
   // 코드
-  Ls.forEach(L=>LESSONS[L].steps.forEach((s,i)=>{ if(!s.code) return; const src=A[(s.lang==='py'?'py_':'code_')+s.id]; if(!src||!A[s.id]) return;
+  if(detail) Ls.forEach(L=>LESSONS[L].steps.forEach((s,i)=>{ if(!s.code) return; const src=A[(s.lang==='py'?'py_':'code_')+s.id]; if(!src||!A[s.id]) return;
     h+=`<h4>작성한 코드 — ${L[1]}-${i+1} ${esc(s.title.split(' — ')[0])} (${esc(s.fname||'')})</h4><div class="a" style="font-family:Consolas,monospace;font-size:12.5px">${esc(src)}</div>`; }));
   if(h){ const x=el('div'); x.innerHTML=h; b.appendChild(x); }
+  return b;
+}
+function writtenList(){                            // 서술·활동 단계에서 학생이 쓴 내용만 모아 간단히
+  const out=[];
+  Object.keys(LESSONS).forEach(L=>LESSONS[L].steps.forEach((s,i)=>{ if(s.graded) return; const v=A[s.id];
+    if(v==null||v==='') return;
+    out.push(`<div style="margin:7px 0"><b>${L[1]}-${i+1}</b> ${esc(s.title)}<div style="margin:2px 0 0 14px;white-space:pre-wrap;color:#334155">${esc(v)}</div></div>`); }));
+  return out.join('');
 }
 
 /* ===== teacher.js ===== */
@@ -4700,60 +4802,75 @@ function renderTeacher(){
    · 교사 결과 보기 : 학생 기록을 잠시 S·A·LESSONS 로 바꿔 끼워 학생 화면과 같은 점수표를 그린다 (withState).
    ===================================================================== */
 const loggedIn=()=>!!S.sid;
-const LOGOUT_Q='로그아웃할까요?\n기록은 이 컴퓨터에 남아 있어, 같은 학번과 이름으로 다시 들어오면 이어서 할 수 있습니다.';
-function login(sid, name){
+function login(sid, name, done){
   sid=String(sid).trim(); name=String(name).trim().replace(/\s+/g,' ');
   if(!sid) return {err:'학번을 입력하세요.', f:1};
   if(!/^[0-9A-Za-z가-힣_-]{1,12}$/.test(sid)) return {err:'학번은 띄어쓰기 없이 12자 이내로 입력하세요. (예: 20315)', f:1};
   if(!name) return {err:'이름을 입력하세요.', f:2};
-  let u=readUser(sid);
-  if(u&&u.name&&u.name!==name&&!confirm(`학번 ${sid} 에는 '${u.name}' 이름으로 된 기록이 있습니다.\n본인의 기록이 맞으면 [확인]을 누르세요. (이름을 '${name}'(으)로 바꿉니다)`)) return {cancel:true};
-  if(!u){ u=blankS(); u.course=S.course||'F';
-    const old=jparse(LS.get(KEY),null);                  // 학번 없이 저장된 예전 판 기록
-    if(old){ const n=Object.keys(old.done||{}).length;
-      if(n&&confirm(`이 컴퓨터에 학번 없이 저장된 예전 기록이 있습니다 (이름 : ${old.name||'없음'}, 완료 ${n}단계).\n이 기록을 ${sid} ${name} 학생의 기록으로 옮길까요?`)){
-        Object.assign(u,{course:old.course||u.course, pos:old.pos||{}, done:old.done||{}, ans:old.ans||{}}); LS.del(KEY); } } }
-  u.sid=sid; u.name=name; u.mode=CFG.mode; S=u; A=S.ans; SS.set(CUR,sid); save(); return {};
+  const u0=readUser(sid);
+  const go2=()=>{ const u=u0||Object.assign(blankS(),{course:S.course||'F'});
+    u.sid=sid; u.name=name; u.mode=CFG.mode; S=u; A=S.ans; SS.set(CUR,sid); save(); done&&done(); };
+  const old=!u0?jparse(LS.get(KEY),null):null;          // 학번 없이 저장된 예전 판 기록
+  const oldN=old?Object.keys(old.done||{}).length:0;
+  const step2=()=>{ if(!oldN) return go2();
+    ask(`이 컴퓨터에 학번 없이 저장된 예전 기록이 있습니다 (이름 : ${old.name||'없음'}, 완료 ${oldN}단계).\n이 기록을 ${sid} ${name} 학생의 기록으로 옮길까요?`,
+      ()=>{ go2(); Object.assign(S,{course:old.course||S.course, pos:old.pos||{}, done:old.done||{}, ans:old.ans||{}}); A=S.ans; LS.del(KEY); save(); renderWho(); setCourse(S.course||'F'); },
+      {yes:'옮기기', no:'새로 시작', onNo:go2}); };
+  if(u0&&u0.name&&u0.name!==name)
+    ask(`학번 ${sid} 에는 '${u0.name}' 이름으로 된 기록이 있습니다.\n본인의 기록이 맞으면 [이어서 하기]를 누르세요. (이름을 '${name}'(으)로 바꿉니다)`, go2, {yes:'이어서 하기'});
+  else step2();
+  return {};
 }
-function logout(){ save(); SS.del(CUR); location.reload(); }
+function logout(){ save(); SS.del(CUR); location.reload(); }   // 기록은 학번별로 남으므로 확인 창 없이 바로 나간다
 function loginForm(host, after){
   const f=el('div','loginf');
   f.innerHTML=`<label>학번<input class="txt" maxlength="12" autocomplete="off" inputmode="numeric" placeholder="예: 20315"></label>
     <label>이름<input class="txt" maxlength="20" autocomplete="off" placeholder="예: 홍길동"></label>`;
   const [i1,i2]=f.querySelectorAll('input'), b=el('button','btn big','시작하기 →'); f.appendChild(b);
   const msg=el('div','fb'); host.appendChild(f); host.appendChild(msg);
-  const sub=()=>{ const r=login(i1.value,i2.value);
-    if(r.err){ msg.className='fb show x'; msg.textContent=r.err; (r.f===2?i2:i1).focus(); return; }
-    if(r.cancel) return;
-    renderWho(); setCourse(S.course||'F'); after&&after(); };
+  const sub=()=>{ const r=login(i1.value, i2.value, ()=>{ renderWho(); setCourse(S.course||'F'); after&&after(); });
+    if(r.err){ msg.className='fb show x'; msg.textContent=r.err; (r.f===2?i2:i1).focus(); } };
   b.onclick=sub; [i1,i2].forEach(x=>x.addEventListener('keydown',e=>{ if(e.key==='Enter') sub(); }));
   return f;
 }
 function renderWho(){
   const w=$('#who'); if(!w) return; w.innerHTML='';
-  if(!loggedIn()){ w.appendChild(el('span',null,'로그인 전')); return; }
+  if(teacherOK()){ w.appendChild(el('span','tbadge','👩‍🏫 교사'));
+    const t=el('button',null,'교사 모드 끝내기'); t.onclick=()=>teacherLock(); w.appendChild(t); }
+  if(!loggedIn()){ if(!teacherOK()) w.appendChild(el('span',null,'로그인 전')); return; }
   w.appendChild(el('span',null,`<b>${esc(S.sid)}</b> ${esc(S.name)}`));
   const b=el('button',null,'로그아웃'); b.title='다른 학생이 이 컴퓨터를 쓸 수 있도록 접속을 끝냅니다';
-  b.onclick=()=>{ if(confirm(LOGOUT_Q)) logout(); }; w.appendChild(b);
+  b.onclick=()=>logout(); w.appendChild(b);
 }
+/* 첫 화면 : 왼쪽 교사용 칸 · 오른쪽 학생용 칸 */
 function renderLogin(){
   const c=$('#loginCard'); if(!c) return; c.innerHTML='';
+  const g=el('div','logingrid'); c.appendChild(g); const tp=el('div','tpanel'), sp=el('div','spanel'); g.append(tp,sp);
+  tp.appendChild(el('h3',null,'👩‍🏫 교사용'));
+  if(teacherOK()){
+    tp.appendChild(el('p','sub','교사로 접속했습니다. 위 <b>[교육과정] · [교사 자료]</b> 탭이 열려 있고, 학번 없이도 차시를 미리 볼 수 있습니다(미리 보기 기록은 저장되지 않음).'));
+    const b1=el('button','btn sm','교사 자료 · 학생 결과'); b1.onclick=()=>go('teacher');
+    const b2=el('button','btn ghost sm','교육과정'); b2.onclick=()=>go('curr');
+    const b3=el('button','btn ghost sm','교사 모드 끝내기'); b3.onclick=()=>teacherLock();
+    const bb=el('div','noprint'); bb.append(b1,b2,b3); tp.appendChild(bb); }
+  else { tp.appendChild(el('p','sub','교사 비밀번호를 넣으면 <b>[교육과정] · [교사 자료]</b>(학생 결과 모아 보기) 탭이 나타납니다. 학생 화면에는 두 탭이 보이지 않습니다.'));
+    teacherPwForm(tp); }
   if(!loggedIn()){
-    c.appendChild(el('h2',null,'학번과 이름을 입력하고 시작하세요'));
-    c.appendChild(el('p','sub','내 답과 점수는 <b>학번별로</b> 이 컴퓨터(브라우저)에 저장됩니다. 창을 닫았다가 같은 학번과 이름으로 다시 들어오면 이어서 할 수 있습니다.'));
-    loginForm(c); return; }
+    sp.appendChild(el('h3',null,'🎒 학생용 — 학번과 이름을 입력하고 시작하세요'));
+    sp.appendChild(el('p','sub','내 답과 점수는 <b>학번별로</b> 이 컴퓨터(브라우저)에 저장됩니다. 창을 닫았다가 같은 학번과 이름으로 다시 들어오면 이어서 할 수 있습니다.'));
+    loginForm(sp); return; }
   const Ls=Object.keys(LESSONS), ev=Ls.map(L=>lessonEval(L)), dn=ev.reduce((a,r)=>a+r.done,0), tot=ev.reduce((a,r)=>a+r.total,0);
   const shown=ev.map((r,i)=>[Ls[i],r]).filter(([,r])=>r.started&&r.score!=null&&(r.fixed||S.mode==='now'));
   const C=COURSES[S.course]||COURSES.F;
-  c.appendChild(el('h2',null,`${esc(S.name)} 학생, 반갑습니다 👋`));
-  c.appendChild(el('p','sub',`학번 <b>${esc(S.sid)}</b> · ${C.icon} ${C.name} · 완료 <b>${dn} / ${tot}</b>단계`));
-  if(shown.length) c.appendChild(el('div','chips',shown.map(([L,r])=>`<span>${L[1]}차시 <b class="${scCls(r.score)}">${r.score}점</b>${r.fixed?'':' <span class="hint">(채점 전)</span>'}</span>`).join('')));
+  sp.appendChild(el('h3',null,`${esc(S.name)} 학생, 반갑습니다 👋`));
+  sp.appendChild(el('p','sub',`학번 <b>${esc(S.sid)}</b> · ${C.icon} ${C.name} · 완료 <b>${dn} / ${tot}</b>단계`));
+  if(shown.length) sp.appendChild(el('div','chips',shown.map(([L,r])=>`<span>${L[1]}차시 <b class="${scCls(r.score)}">${r.score}점</b>${r.fixed?'':' <span class="hint">(채점 전)</span>'}</span>`).join('')));
   const bar=el('div','noprint');
   const b1=el('button','btn','📊 내 점수표 · 보고서'); b1.onclick=()=>go('report');
   const b2=el('button','btn teal','📤 결과 파일 저장'); b2.onclick=exportResult;
-  const b3=el('button','btn ghost','다른 학생으로 접속 (로그아웃)'); b3.onclick=()=>{ if(confirm(LOGOUT_Q)) logout(); };
-  bar.append(b1,b2,b3); c.appendChild(bar);
-  c.appendChild(el('p','hint','수업을 마치면 [결과 파일 저장]을 눌러 만든 파일을 선생님이 안내한 곳에 제출하세요. 파일에는 학번 · 이름 · 답 · 점수가 들어 있습니다.'));
+  const b3=el('button','btn ghost','다른 학생으로 접속 (로그아웃)'); b3.onclick=()=>logout();
+  bar.append(b1,b2,b3); sp.appendChild(bar);
+  sp.appendChild(el('p','hint','수업을 마치면 [결과 파일 저장]을 눌러 만든 파일을 선생님이 안내한 곳에 제출하세요. 파일에는 학번 · 이름 · 답 · 점수가 들어 있습니다.'));
 }
 
 /* ========== 결과 파일 ========== */
@@ -4765,11 +4882,11 @@ function download(name, text, type){
   document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },3000);
 }
 function exportResult(){
-  if(!loggedIn()){ alert('먼저 [시작하기] 탭에서 학번과 이름을 입력하세요.'); go('home'); return; }
+  if(!loggedIn()){ say('먼저 [시작하기] 탭에서 학번과 이름을 입력하세요.','bad'); go('home'); return; }
   save(); const p=payloadOf(S), f=Object.assign({},p,{sig:sha256hex(SIG2+JSON.stringify(p))});
   const nm=`${APP2}_${S.sid}_${S.name}.json`.replace(/[\\/:*?"<>|\s]+/g,'_');
   download(nm, JSON.stringify(f), 'application/json');
-  setTimeout(()=>alert(`결과 파일을 저장했습니다.\n파일 이름 : ${nm}\n\n브라우저의 [다운로드] 폴더에 있습니다. 선생님이 안내한 곳에 이 파일을 제출하세요.`),300);
+  say(`결과 파일을 저장했습니다 — ${nm}\n브라우저의 [다운로드] 폴더에 있습니다. 선생님이 안내한 곳에 이 파일을 제출하세요.`,'ok');
 }
 
 /* ========== SHA-256 (교사 비밀번호 확인 · 결과 파일 서명) ========== */
@@ -4805,24 +4922,33 @@ function pwHash(pw){ let h=sha256hex(TPW.s+pw); for(let i=0;i<TPW.n;i++) h=sha25
 const TKEY=KEY+'__t';
 const teacherOK=()=>SS.get(TKEY)==='1';
 let T_WRAP=null;
+function teacherPwForm(host, big){
+  const row=el('div','loginf'), lab=el('label',null,'교사 비밀번호'), inp=el('input','txt');
+  inp.type='password'; inp.autocomplete='off'; inp.maxLength=40; lab.appendChild(inp); row.appendChild(lab);
+  const b=el('button','btn'+(big?' big':''),'교사로 접속'); row.appendChild(b); host.appendChild(row);
+  const msg=el('div','fb'); host.appendChild(msg);
+  const tryOpen=()=>{ const v=inp.value; if(!v) return; b.disabled=true;
+    setTimeout(()=>{ const ok=pwHash(v)===TPW.h; b.disabled=false; inp.value='';
+      if(ok){ SS.set(TKEY,'1'); setTeacherMode(); go('teacher'); }
+      else { msg.className='fb show x'; msg.textContent='비밀번호가 맞지 않습니다.'; inp.focus(); } },30); };
+  b.onclick=tryOpen; inp.addEventListener('keydown',e=>{ if(e.key==='Enter') tryOpen(); });
+}
 function renderTeacherGate(){
   const sec=$('#teacher'), lock=$('#tLock'); if(!T_WRAP) T_WRAP=$('#tWrap');
   lock.innerHTML='';
   if(teacherOK()){ if(!T_WRAP.isConnected) sec.appendChild(T_WRAP); renderTeacher(); renderDash(); return; }
   if(T_WRAP.isConnected) T_WRAP.remove();
-  const c=el('div','card');
-  c.innerHTML='<h2>🔒 교사 전용</h2><p class="sub">교사 자료와 <b>학생 결과 모아 보기</b>는 선생님만 열 수 있습니다. 교사 비밀번호를 입력하세요.</p>';
-  const row=el('div','loginf'), lab=el('label',null,'교사 비밀번호'), inp=el('input','txt');
-  inp.type='password'; inp.autocomplete='off'; inp.maxLength=40; lab.appendChild(inp); row.appendChild(lab);
-  const b=el('button','btn big','열기'); row.appendChild(b); c.appendChild(row);
-  const msg=el('div','fb'); c.appendChild(msg);
-  const tryOpen=()=>{ const v=inp.value; if(!v) return; b.disabled=true;
-    setTimeout(()=>{ const ok=pwHash(v)===TPW.h; b.disabled=false; inp.value='';
-      if(ok){ SS.set(TKEY,'1'); renderTeacherGate(); } else { msg.className='fb show x'; msg.textContent='비밀번호가 맞지 않습니다.'; inp.focus(); } },30); };
-  b.onclick=tryOpen; inp.addEventListener('keydown',e=>{ if(e.key==='Enter') tryOpen(); });
-  lock.appendChild(c);
+  const c=el('div','card'); c.innerHTML='<h2>🔒 교사 전용</h2><p class="sub">교사 자료와 <b>학생 결과 모아 보기</b>는 선생님만 열 수 있습니다.</p>';
+  teacherPwForm(c,true); lock.appendChild(c);
 }
-function teacherLock(){ SS.del(TKEY); renderTeacherGate(); window.scrollTo({top:0}); }
+function setTeacherMode(){                        // 교사 모드가 켜지거나 꺼질 때 화면을 맞춘다
+  document.body.classList.toggle('tmode', teacherOK());
+  renderTeacherGate(); renderWho(); renderLogin();
+  const on=$('section.tab.on'); if(!on) return;
+  if(!teacherOK()&&(on.id==='curr'||on.id==='teacher')) go('home');
+  else if(/^L\d+$/.test(on.id)) renderLesson(on.id);
+}
+function teacherLock(){ SS.del(TKEY); setTeacherMode(); window.scrollTo({top:0}); }
 
 /* ========== 교사 : 학생 결과 모아 보기 ==========
    학생 결과 파일(.json)을 여러 개 불러와 이 컴퓨터('ipc2_data_state_v1__dash')에 모은다. 같은 학번은 더 나중에 저장한 파일로 바꾼다. */
@@ -4840,7 +4966,7 @@ function withState(st, fn){
 }
 function sumOf(st){ return withState(st, ()=>{ const Ls=Object.keys(LESSONS), ev=Ls.map(L=>lessonEval(L)), g=ev.filter(r=>r.G.length);
   return {Ls, ev, avg:g.length?Math.round(g.reduce((a,r)=>a+(r.score||0),0)/g.length):0, done:ev.reduce((a,r)=>a+r.done,0), total:ev.reduce((a,r)=>a+r.total,0)}; }); }
-function dashStore(){ if(!LS.set(DKEY, JSON.stringify(DASH))) alert('이 컴퓨터의 저장 공간이 부족해 목록을 저장하지 못했습니다. 이 창을 닫기 전까지만 유지됩니다.'); }
+function dashStore(){ if(!LS.set(DKEY, JSON.stringify(DASH))) say('이 컴퓨터의 저장 공간이 부족해 목록을 저장하지 못했습니다. 이 창을 닫기 전까지만 유지됩니다.','bad'); }
 function dashPut(p, how, file){ const r={p, how, file:file||''}, i=DASH.findIndex(x=>x.p.sid===p.sid);
   if(i<0) DASH.push(r); else if((p.savedAt||0)>=(DASH[i].p.savedAt||0)) DASH[i]=r; }
 function readResult(txt, name){
@@ -4851,9 +4977,9 @@ function readResult(txt, name){
 }
 function dashFiles(files){
   const list=[...(files||[])].filter(f=>/\.json$/i.test(f.name)||f.type==='application/json');
-  if(!list.length){ alert('.json 결과 파일을 골라 주세요.'); return; }
+  if(!list.length){ say('.json 결과 파일을 골라 주세요.','bad'); return; }
   let left=list.length; const errs=[];
-  const fin=()=>{ if(--left>0) return; dashStore(); renderDash(); if(errs.length) alert('불러오지 못한 파일\n'+errs.join('\n')); };
+  const fin=()=>{ if(--left>0) return; dashStore(); renderDash(); say(errs.length?'불러오지 못한 파일\n'+errs.join('\n'):`결과 파일 ${list.length-errs.length}개를 불러왔습니다.`, errs.length?'bad':'ok'); };
   list.forEach(fl=>{ const rd=new FileReader();
     rd.onload=()=>{ const e=readResult(String(rd.result), fl.name); if(e) errs.push(e); fin(); };
     rd.onerror=()=>{ errs.push(fl.name+' : 읽지 못했습니다'); fin(); };
@@ -4861,7 +4987,7 @@ function dashFiles(files){
 }
 function dashLocal(){ let n=0;
   LS.keys().filter(k=>k.startsWith(UKEY)).forEach(k=>{ const st=readUser(k.slice(UKEY.length)); if(st&&st.sid){ const p=payloadOf(st); p.savedAt=st.at||0; dashPut(p,'local'); n++; } });
-  dashStore(); renderDash(); alert(n?`이 컴퓨터에 저장된 학생 기록 ${n}명을 불러왔습니다.`:'이 컴퓨터에 저장된 학생 기록이 없습니다.'); }
+  dashStore(); renderDash(); say(n?`이 컴퓨터에 저장된 학생 기록 ${n}명을 불러왔습니다.`:'이 컴퓨터에 저장된 학생 기록이 없습니다.', n?'ok':'bad'); }
 const courseOf=p=>COURSES[p.course]?p.course:'F';
 function dashRows(course){ return DASH.filter(r=>courseOf(r.p)===course).sort((a,b)=>String(a.p.sid).localeCompare(String(b.p.sid),'ko',{numeric:true})); }
 const howTxt=h=>h==='ok'?'<span class="hi" title="앱이 만든 그대로의 결과 파일입니다">✔ 확인</span>'
@@ -4901,7 +5027,8 @@ function renderDash(){
     d.appendChild(el('h3',null,`${esc(r.p.sid)} ${esc(r.p.name)} — ${esc(set[dashLesson].title)} <span class="hint">· 저장 ${fmtT(r.p.savedAt)} · ${howTxt(r.how)}${r.file?' · '+esc(r.file):''}</span>`));
     d.appendChild(withState(r.p.state, ()=>resultsTable(dashLesson,{teacher:true, full:true})));
     const rm=el('button','btn ghost sm noprint','이 학생을 목록에서 빼기');
-    rm.onclick=()=>{ if(confirm(`${r.p.sid} ${r.p.name} 학생을 목록에서 뺍니다. (학생 파일은 지워지지 않습니다)`)){ DASH=DASH.filter(x=>x!==r); dashSel=null; dashStore(); renderDash(); } };
+    rm.onclick=()=>ask(`${r.p.sid} ${r.p.name} 학생을 목록에서 뺍니다. (학생 파일은 지워지지 않습니다)`,
+      ()=>{ DASH=DASH.filter(x=>x!==r); dashSel=null; dashStore(); renderDash(); },{yes:'빼기'});
     d.appendChild(rm); box.appendChild(d); }
   /* 문항별 정답률 */
   box.appendChild(el('h3',null,`문항별 정답률 — ${esc(set[dashLesson].title)}`));
@@ -4922,7 +5049,7 @@ function itemStats(course, L, rows){
   return h+'</table><p class="hint">평균 = 제출한 학생들의 문항 점수 평균(처음 제출한 답 기준) · 많이 틀린 부분 = 여러 칸으로 된 문항에서 틀린 학생 수가 많은 칸 · 퀴즈는 문항별 정답률</p>';
 }
 function dashCSV(){
-  if(!DASH.length){ alert('불러온 결과가 없습니다.'); return; }
+  if(!DASH.length){ say('불러온 결과가 없습니다.','bad'); return; }
   const course=dashCourse||'F', C=COURSES[course], Ls=Object.keys(C.lessons), rows=dashRows(course);
   const q=v=>{ v=String(v==null?'':v); return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const out=[['학번','이름','과정',...Ls.map(L=>L[1]+'차시 점수'),...Ls.map(L=>`${L[1]}차시 완료 단계(총 ${C.lessons[L].steps.length})`),'전체 점수','완료 단계','전체 단계','마지막 활동','저장 시각','파일 확인']];
@@ -4944,10 +5071,12 @@ function wireDash(){
   window.addEventListener('drop',e=>{ e.preventDefault(); if(teacherOK()&&$('#teacher').classList.contains('on')&&e.dataTransfer) dashFiles(e.dataTransfer.files); });
   $('#dashLocalB').onclick=dashLocal;
   $('#dashCsv').onclick=dashCSV;
-  $('#dashClear').onclick=()=>{ if(DASH.length&&confirm(`불러온 학생 결과 ${DASH.length}명을 목록에서 지웁니다. (학생 파일은 지워지지 않습니다)`)){ DASH=[]; dashSel=null; dashStore(); renderDash(); } };
-  $('#dashWipe').onclick=()=>{ const ks=LS.keys().filter(k=>k.startsWith(UKEY)); if(!ks.length){ alert('이 컴퓨터에 저장된 학생 기록이 없습니다.'); return; }
-    if(!confirm(`이 컴퓨터(브라우저)에 저장된 학생 기록 ${ks.length}명분을 모두 지웁니다.\n학기를 마친 공용 컴퓨터를 정리할 때 쓰세요. 되돌릴 수 없습니다. 계속할까요?`)) return;
-    ks.forEach(k=>LS.del(k)); LS.del(KEY); alert('지웠습니다.'); if(S.sid){ SS.del(CUR); location.reload(); } };
+  $('#dashClear').onclick=()=>{ if(!DASH.length) return;
+    ask(`불러온 학생 결과 ${DASH.length}명을 목록에서 지웁니다. (학생 파일은 지워지지 않습니다)`,
+      ()=>{ DASH=[]; dashSel=null; dashStore(); renderDash(); },{yes:'목록 비우기',danger:1}); };
+  $('#dashWipe').onclick=()=>{ const ks=LS.keys().filter(k=>k.startsWith(UKEY)); if(!ks.length){ say('이 컴퓨터에 저장된 학생 기록이 없습니다.'); return; }
+    ask(`이 컴퓨터(브라우저)에 저장된 학생 기록 ${ks.length}명분을 모두 지웁니다.\n학기를 마친 공용 컴퓨터를 정리할 때 쓰세요. 되돌릴 수 없습니다.`,
+      ()=>{ ks.forEach(k=>LS.del(k)); LS.del(KEY); if(S.sid){ SS.del(CUR); location.reload(); } else { say('지웠습니다.','ok'); renderDash(); } },{yes:'모두 지우기',danger:1}); };
 }
 
 /* ===== init.js ===== */
@@ -4975,9 +5104,9 @@ function renderHome(){
   renderLogin();
 }
 
-$('#resetAll').onclick=()=>{ if(!loggedIn()){ alert('먼저 학번과 이름을 입력하세요.'); return; }
-  if(confirm(`${S.sid} ${S.name} 학생의 진행 기록과 답안, 점수를 모두 지웁니다. (세 수업 모두) 계속할까요?`)){
-    const {sid,name,course}=S; S=Object.assign(blankS(),{sid,name,course}); A=S.ans; save(); location.reload(); } };
+$('#resetAll').onclick=()=>{ if(!loggedIn()){ say('먼저 학번과 이름을 입력하세요.','bad'); return; }
+  ask(`${S.sid} ${S.name} 학생의 진행 기록과 답안, 점수를 모두 지웁니다. (세 수업 모두) 계속할까요?`,
+    ()=>{ const {sid,name,course}=S; S=Object.assign(blankS(),{sid,name,course}); A=S.ans; save(); location.reload(); }, {yes:'모두 지우기', danger:1}); };
 $('#nav').addEventListener('click',e=>{ const b=e.target.closest('button[data-tab]'); if(b) go(b.dataset.tab); });
 if($('#courseBadge')) $('#courseBadge').onclick=()=>{ go('home'); const p=$('#pickCard'); if(p) p.scrollIntoView({behavior:'smooth'}); };
 if($('#mkrep')) $('#mkrep').onclick=buildReport;
@@ -4985,7 +5114,8 @@ if($('#mkrep')) $('#mkrep').onclick=buildReport;
 $$('input[name="gmode"]').forEach(r=>r.addEventListener('change',()=>{ if(r.checked) setMode(r.value); }));   // 채점 방식 : 이 컴퓨터 설정
 
 wireDash();                 // 교사 화면 단추 연결 (문서에서 빼기 전에)
-renderTeacherGate();        // 교사 화면 : 비밀번호를 넣기 전에는 문서에서 빼 둔다
+document.body.classList.toggle('tmode', teacherOK());
+renderTeacherGate();        // 교사 화면 : 교사 모드가 아니면 문서에서 빼 둔다
 renderWho();
 setCourse(S.course||'F');
 let rz, lastW=window.innerWidth;
